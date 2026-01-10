@@ -1,3 +1,10 @@
+# user ignore file
+*.onnx
+*mediamtx*
+output_images
+calib_dataset
+yolov8n_openvino_model
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
