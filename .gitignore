@@ -1,9 +1,13 @@
 # user ignore file
-*.onnx
 *mediamtx*
 output_images
 calib_dataset
 yolov8n_openvino_model
+*.jpg
+*.jpeg
+*.bmp
+*.pt
+*.onnx
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
