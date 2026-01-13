@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 from typing import Tuple
 import config
+import subprocess
 
 
 class VideoProcessor:
@@ -93,32 +94,55 @@ class RTSPCapture:
     def _connect(self):
         """Establish RTSP stream connection"""
         print(f"[{self.camera_name}] Connecting to RTSP stream...")
-        self.cap = cv2.VideoCapture(self.url)
-        if self.cap.isOpened():
-            print(f"[{self.camera_name}] ✅ Connection established")
-            # Si un FPS est fourni, on le change
-            # fps = 2
-            if fps is not None:
-                success = self.cap.set(cv2.CAP_PROP_FPS, fps)
-                if success:
-                    print(f"[{self.camera_name}] 🎯 FPS set to {fps}")
-                else:
-                    print(f"[{self.camera_name}] ⚠️ Failed to set FPS")
 
-            # Changer la résolution si demandée
-            # width = 640
-            # height = 640
-            if width is not None and height is not None:
-                success_w = self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-                success_h = self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-                if success_w and success_h:
-                    print(f"[{self.camera_name}] 🎯 Resolution set to {width}x{height}")
-                else:
-                    print(f"[{self.camera_name}] ⚠️ Failed to set resolution")
+        self.width,  self.height = self.get_resolution(self.url)
+
+        cmd = [
+            "ffmpeg",
+            "-rtsp_transport", "tcp",
+            "-i", self.url,
+            "-vf", f"fps={config.VIDEO_FPS}",
+            "-f", "rawvideo",
+            "-pix_fmt", "bgr24",
+            "-"
+        ]
+
+        self.proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            bufsize=10**7
+        )
+
+        self.frame_size = self.width * self.height * 3
+        print(f"[{self.camera_name}] ✅ Connection established")
+
+        # self.cap = cv2.VideoCapture(self.url)
+        # if self.cap.isOpened():
+        #     print(f"[{self.camera_name}] ✅ Connection established")
+        #     # Si un FPS est fourni, on le change
+        #     # fps = 2
+        #     # if fps is not None:
+        #     #     success = self.cap.set(cv2.CAP_PROP_FPS, fps)
+        #     #     if success:
+        #     #         print(f"[{self.camera_name}] 🎯 FPS set to {fps}")
+        #     #     else:
+        #     #         print(f"[{self.camera_name}] ⚠️ Failed to set FPS")
+
+        #     # Changer la résolution si demandée
+        #     # width = 640
+        #     # height = 640
+        #     # if width is not None and height is not None:
+        #     #     success_w = self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+        #     #     success_h = self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+        #     #     if success_w and success_h:
+        #     #         print(f"[{self.camera_name}] 🎯 Resolution set to {width}x{height}")
+        #     #     else:
+        #     #         print(f"[{self.camera_name}] ⚠️ Failed to set resolution")
 
 
-        else:
-            print(f"[{self.camera_name}] ⚠️ Connection failed")
+        # else:
+        #     print(f"[{self.camera_name}] ⚠️ Connection failed")
     
     def read(self) -> Tuple[bool, np.ndarray]:
         """
@@ -127,15 +151,22 @@ class RTSPCapture:
         Returns:
             Tuple (success, frame)
         """
-        if not self.cap or not self.cap.isOpened():
-            self._reconnect()
+
+        raw = self.proc.stdout.read(self.frame_size)
+        if not raw:
             return False, None
+
+        frame = np.frombuffer(raw, np.uint8).reshape((self.height, self.width, 3)).copy()
+
+        # if not self.cap or not self.cap.isOpened():
+        #     self._reconnect()
+        #     return False, None
         
-        ret, frame = self.cap.read()
+        # ret, frame = self.cap.read()
         
-        if not ret:
-            self._reconnect()
-            return False, None
+        # if not ret:
+        #     self._reconnect()
+        #     return False, None
         
         return True, frame
     
@@ -154,3 +185,17 @@ class RTSPCapture:
         if self.cap:
             self.cap.release()
         print(f"[{self.camera_name}] Capture released")
+
+    def get_resolution(self, rtsp_url):
+        cmd = [
+            "ffprobe",
+            "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=width,height",
+            "-of", "csv=p=0",
+            rtsp_url
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        print(f"get_resolution { result.stdout.strip()} - {rtsp_url}")
+        width, height = map(int, result.stdout.strip().split(','))
+        return width, height

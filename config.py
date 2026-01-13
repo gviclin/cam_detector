@@ -24,8 +24,8 @@ COCO_CLASSES = [
 # Camera configuration
 CAMERAS = [
     {"name": "kitchen", "url": "rtsp://DY9bKwcB:l9lSQDtDCvLmNZUT@192.168.68.52/live/ch1"},
-    # {"name": "ext_north", "url": "rtsp://FlZgCcmK:eALNj6HmzLZ9MDzF@192.168.68.54/live/ch1"},
-    # {"name": "ext_south", "url": "rtsp://T7iby8nk:jx1IXcoYaUe5jrHs@192.168.68.53/live/ch1"},
+    {"name": "ext_north", "url": "rtsp://FlZgCcmK:eALNj6HmzLZ9MDzF@192.168.68.54/live/ch1"},
+    # {"name": "ext_south", "url": "rtsp://T7iby8nk:jx1IXcoYaUe5jrHs@192.168.68.53/live/ch1"}
 ]
 
 # Video processing parameters
@@ -37,7 +37,7 @@ TARGET_RATIO = 16/9  # Crop ratio
 
 # Output parameters
 SAVE_DIR = "output_images"
-OFF_DELAY = 2  # delay before switching to OFF after last detection
+OFF_DELAY = 4  # delay before switching to OFF after last detection
 
 # MQTT configuration
 MQTT_BROKER = "192.168.68.55"

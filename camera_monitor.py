@@ -46,7 +46,7 @@ class CameraMonitor:
         
         # Video capture
         self.capture = RTSPCapture(camera_config["url"], self.name)
-    
+   
     def _prepare_save_directory(self):
         """Prepare save directory (empty if exists)"""
         if os.path.exists(self.save_dir):
@@ -113,11 +113,10 @@ class CameraMonitor:
         # Detection
         start = time.time()
         detections = self.detector.detect_persons(processed_frame)
-        # end = time.time()
-        # timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        # end = time.time()        # 
         # print(f"{timestamp} - [{self.name}] Inference Duration : {(end - start) * 1000:.2f} ms")
-        
-        
+                
         # Draw dectection bounding box        
         for det in detections:
             VideoProcessor.draw_detection(
@@ -130,7 +129,7 @@ class CameraMonitor:
         detected = len(detections) > 0
         self._update_state(detected)
         
-        if detected:
+        if self.state == "ON":
             self._save_frame(processed_frame, timestamp)
     
     def run(self):
@@ -144,9 +143,12 @@ class CameraMonitor:
             ret, frame = self.capture.read()
 
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            print(f"{timestamp} - [{self.name}] new frame")
+
+            # timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            # print(f"{timestamp} - [{self.name}] new frame")
             
-            if not ret:
+            if not ret:                
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
                 print(f"❌  {timestamp} - [{self.name}] Frame error")
                 continue
             
