@@ -36,6 +36,7 @@ class YOLODetector:
         self._lock = threading.Lock()
         self._running = True
 
+        print(f"🔄 Load YOLO model")
         self.model = YOLO(self.model_path)
         print(f"✅ YOLO model loaded: {self.model_path} (device: {device})")
 

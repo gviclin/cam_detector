@@ -1,3 +1,6 @@
+stty sane
+stty echo
+
 
 wget https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_linux_amd64.tar.gz
 tar -xzf mediamtx_linux_amd64.tar.gz

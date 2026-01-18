@@ -13,6 +13,7 @@ from video_processor import RTSPCapture, VideoProcessor
 from detector import YOLODetector
 from mqtt_manager import MQTTManager
 from threading import Event
+import threading
 
 
 class CameraMonitor:
@@ -28,6 +29,7 @@ class CameraMonitor:
             detector: YOLO detector instance
             mqtt_manager: MQTT manager instance
         """
+        start = time.time()
         self.camera = camera_config
         self.name = camera_config["name"]
         self.detector = detector
@@ -46,13 +48,16 @@ class CameraMonitor:
         
         # Video capture
         self.capture = RTSPCapture(camera_config["url"], self.name)
+
+        elapsed = time.time() - start
+        print(f"[{self.name}] ✅ Init ok. Time : {elapsed:.3f} s")
    
     def _prepare_save_directory(self):
         """Prepare save directory (empty if exists)"""
         if os.path.exists(self.save_dir):
             shutil.rmtree(self.save_dir)
         os.makedirs(self.save_dir, exist_ok=True)
-        print(f"[{self.name}] 📁 Directory ready: {self.save_dir}")
+        # print(f"[{self.name}] 📁 Directory ready: {self.save_dir}")
     
     def _should_process_frame(self) -> bool:
         """Determine if frame should be processed (throttling)"""
@@ -135,6 +140,8 @@ class CameraMonitor:
     def run(self):
         """Main monitoring loop"""
         print(f"[{self.name}] 🎥 Starting surveillance")
+
+        # print(f"[Other Thread ] {threading.current_thread().name}, ID : {threading.get_ident()}")
         
         # Publish initial state
         self.mqtt.publish_state(self.name, self.state)

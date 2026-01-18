@@ -66,4 +66,4 @@ class MQTTManager:
         """Disconnect cleanly from MQTT broker"""
         self.client.loop_stop()
         self.client.disconnect()
-        print("❌ Disconnected from MQTT broker")
+        print("✅ MQTT disconnected from broker")

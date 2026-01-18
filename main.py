@@ -1,9 +1,10 @@
 """
 Main application for multi-camera surveillance with YOLO detection
 """
-import sys
+import sys, os
 import traceback
 import signal
+import threading
 from threading import Thread, Event
 from typing import List
 import config
@@ -50,9 +51,12 @@ class MultiCameraSystem:
 
         print(f"✅ {len(self.monitors)} camera(s) configured")
         print("=" * 60)
+        
 
     def start(self):
         """Start surveillance for all cameras"""
+
+        # print(f"[Main Thread ] {threading.current_thread().name}, ID : {threading.get_ident()}")
 
         for monitor in self.monitors:
             t = Thread(
@@ -62,7 +66,7 @@ class MultiCameraSystem:
             )
             t.start()
             self.threads.append(t)
-            print(f"▶️  Thread started for {monitor.name}")
+            # print(f"▶️  Thread started for {monitor.name}")
 
         print("\n🟢 System operational - Press Ctrl+C to stop")
 
@@ -75,6 +79,9 @@ class MultiCameraSystem:
         except KeyboardInterrupt:
             print("\n\n🛑 Stop requested (Ctrl+C)")
             self.stop()
+        finally:
+            self.restore_terminal()
+            print("✅ Restaure terminal")
 
     def stop(self):
         """Stop system cleanly"""
@@ -82,11 +89,9 @@ class MultiCameraSystem:
         if self.stop_event.is_set():
             return  # évite double stop
 
-        print("🔄 Stopping system...")
         self.stop_event.set()
 
         # Stop cameras
-        print("🔄 Stopping monitors...")
         for monitor in self.monitors:
             monitor.stop()
 
@@ -104,12 +109,18 @@ class MultiCameraSystem:
         print("🔄 Disconnecting MQTT...")
         self.mqtt.disconnect()
 
-        print("✅ System stopped cleanly")
+        print("=" * 60)
+        print("🎬 Multi-Camera Surveillance System stopped cleanly")
+        print("=" * 60)
 
-    def _signal_handler(self, signum, frame):
-            print(f"\n\n🛑 [maint thread] Stop requested (Ctrl+C). Signal {signum} received")
-            self.stop()
-            sys.exit(0)
+    # def _signal_handler(self, signum, frame):
+    #         print(f"\n\n🛑 [maint thread] Stop requested (Ctrl+C). Signal {signum} received")
+    #         self.stop()
+    #         sys.exit(0)
+
+    def restore_terminal(this):
+        """Restaure bash à coup sûr"""
+        os.system("stty sane")
 
 def main():
     try:
