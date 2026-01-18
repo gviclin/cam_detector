@@ -65,8 +65,8 @@ class CameraMonitor:
     def _save_frame(self, frame, timestamp: str):
         """Save frame with detection"""
         # # Don't save for kitchen
-        # if "kitchen" in self.name:
-        #     return
+        if "kitchen" in self.name:
+            return
         
         filename = f"{timestamp}-{self.frame_count:04d}.jpg"
         filepath = os.path.join(self.save_dir, filename)
@@ -142,14 +142,13 @@ class CameraMonitor:
         while not self.stop_event.is_set():
             ret, frame = self.capture.read()
 
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-
             # timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
             # print(f"{timestamp} - [{self.name}] new frame")
             
             if not ret:                
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                print(f"❌  {timestamp} - [{self.name}] Frame error")
+                # timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                # print(f"❌  {timestamp} - [{self.name}] Frame error")
+                time.sleep(0.1)
                 continue
             
             try:

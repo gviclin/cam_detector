@@ -1,11 +1,17 @@
 """
 Video stream processing and preprocessing module
 """
+import os
 import cv2
+import signal
 import numpy as np
 from typing import Tuple
 import config
 import subprocess
+# import atexit
+
+# import sys
+
 
 
 class VideoProcessor:
@@ -89,7 +95,14 @@ class RTSPCapture:
         self.url = url
         self.camera_name = camera_name
         self.cap = None
+        self.proc = None
+
         self._connect()
+
+        # # cleanup automatique à la fermeture du script
+        # atexit.register(self.release)
+
+
     
     def _connect(self):
         """Establish RTSP stream connection"""
@@ -111,63 +124,25 @@ class RTSPCapture:
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
-            bufsize=10**7
+            bufsize=10**7,
+            preexec_fn=os.setsid  # crée un nouveau groupe pour tuer ffmpeg et ses enfants
         )
 
         self.frame_size = self.width * self.height * 3
-        print(f"[{self.camera_name}] ✅ Connection established")
-
-        # self.cap = cv2.VideoCapture(self.url)
-        # if self.cap.isOpened():
-        #     print(f"[{self.camera_name}] ✅ Connection established")
-        #     # Si un FPS est fourni, on le change
-        #     # fps = 2
-        #     # if fps is not None:
-        #     #     success = self.cap.set(cv2.CAP_PROP_FPS, fps)
-        #     #     if success:
-        #     #         print(f"[{self.camera_name}] 🎯 FPS set to {fps}")
-        #     #     else:
-        #     #         print(f"[{self.camera_name}] ⚠️ Failed to set FPS")
-
-        #     # Changer la résolution si demandée
-        #     # width = 640
-        #     # height = 640
-        #     # if width is not None and height is not None:
-        #     #     success_w = self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        #     #     success_h = self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        #     #     if success_w and success_h:
-        #     #         print(f"[{self.camera_name}] 🎯 Resolution set to {width}x{height}")
-        #     #     else:
-        #     #         print(f"[{self.camera_name}] ⚠️ Failed to set resolution")
-
-
-        # else:
-        #     print(f"[{self.camera_name}] ⚠️ Connection failed")
+        print(f"[{self.camera_name}] ✅ RTSPCapture configured !")
     
     def read(self) -> Tuple[bool, np.ndarray]:
-        """
-        Read frame from stream
-        
-        Returns:
-            Tuple (success, frame)
-        """
-
-        raw = self.proc.stdout.read(self.frame_size)
-        if not raw:
+        if not self.proc or self.proc.poll() is not None:
             return False, None
 
-        frame = np.frombuffer(raw, np.uint8).reshape((self.height, self.width, 3)).copy()
+        raw = self.proc.stdout.read(self.frame_size)
+        if not raw or len(raw) < self.frame_size:
+            return False, None
 
-        # if not self.cap or not self.cap.isOpened():
-        #     self._reconnect()
-        #     return False, None
-        
-        # ret, frame = self.cap.read()
-        
-        # if not ret:
-        #     self._reconnect()
-        #     return False, None
-        
+        frame = np.frombuffer(raw, np.uint8)\
+                .reshape((self.height, self.width, 3))\
+                .copy()
+
         return True, frame
     
     def _reconnect(self):
@@ -182,8 +157,22 @@ class RTSPCapture:
     
     def release(self):
         """Release resources"""
-        if self.cap:
-            self.cap.release()
+        if not self.proc:
+            return
+
+        if self.proc.poll() is None: # Process not ended yet
+            print(f"[{self.camera_name}] Stopping ffmpeg ...")
+            try:
+                os.killpg(os.getpgid(self.proc.pid), signal.SIGTERM)
+                self.proc.wait(timeout=5)
+                
+            except subprocess.TimeoutExpired:
+                print(f"[{self.camera_name}] ffmpeg force kill")
+                os.killpg(os.getpgid(self.proc.pid), signal.SIGKILL)
+
+            self.proc = None
+
+
         print(f"[{self.camera_name}] Capture released")
 
     def get_resolution(self, rtsp_url):

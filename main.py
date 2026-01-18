@@ -2,95 +2,125 @@
 Main application for multi-camera surveillance with YOLO detection
 """
 import sys
-from threading import Thread
+import traceback
+import signal
+from threading import Thread, Event
 from typing import List
 import config
 from mqtt_manager import MQTTManager
 from detector import YOLODetector
 from camera_monitor import CameraMonitor
-from threading import Event
 
 
 class MultiCameraSystem:
     """Multi-camera surveillance system"""
-    
+
     def __init__(self):
-        """Initialize system"""
-        print("="*60)
+        print("=" * 60)
         print("🎬 Multi-Camera Surveillance System")
-        print("="*60)
-        
-        # Initialize MQTT
+        print("=" * 60)
+
+        # MQTT
         self.mqtt = MQTTManager()
         self.mqtt.connect()
-        
-        # Initialize YOLO detector
+
+        # YOLO
         self.detector = YOLODetector(device="intel:cpu")
 
+        # Stop event partagé
         self.stop_event = Event()
-        
-        # Create camera monitors
+
+        # gestion CTRL+C / kill
+        # signal.signal(signal.SIGINT, self._signal_handler)
+        # signal.signal(signal.SIGTERM, self._signal_handler)  
+
+        # Cameras
         self.monitors: List[CameraMonitor] = []
         for cam_config in config.CAMERAS:
-            monitor = CameraMonitor(
-                cam_config,
-                self.detector,
-                self.mqtt,
-                self.stop_event
+            self.monitors.append(
+                CameraMonitor(
+                    cam_config,
+                    self.detector,
+                    self.mqtt,
+                    self.stop_event
+                )
             )
-            self.monitors.append(monitor)        
-        
+
+        self.threads: List[Thread] = []
+
         print(f"✅ {len(self.monitors)} camera(s) configured")
-        print("="*60)
-    
+        print("=" * 60)
+
     def start(self):
         """Start surveillance for all cameras"""
-        threads = []
-        
+
         for monitor in self.monitors:
-            thread = Thread(
+            t = Thread(
                 target=monitor.run,
                 name=f"Monitor-{monitor.name}",
+                daemon=True
             )
-            thread.daemon = True
-            thread.start()
-            threads.append(thread)
+            t.start()
+            self.threads.append(t)
             print(f"▶️  Thread started for {monitor.name}")
-        
+
         print("\n🟢 System operational - Press Ctrl+C to stop")
-        
 
         try:
-            # On attend que les threads tournent, mais avec timeout pour Ctrl+C
-            while thread in threads:
-                thread.join(timeout=1)
+            # Boucle d’attente non bloquante
+            while not self.stop_event.is_set():
+                for t in self.threads:
+                    t.join(timeout=0.5)
+
         except KeyboardInterrupt:
-             # Ctrl+C détecté → déclenche l'arrêt propre
-            print("\n\n🛑 Stop requested...")
-            self.stop_event.set() 
+            print("\n\n🛑 Stop requested (Ctrl+C)")
             self.stop()
-            for thread in threads:
-                thread.join()
-    
+
     def stop(self):
         """Stop system cleanly"""
+
+        if self.stop_event.is_set():
+            return  # évite double stop
+
+        print("🔄 Stopping system...")
+        self.stop_event.set()
+
+        # Stop cameras
         print("🔄 Stopping monitors...")
         for monitor in self.monitors:
             monitor.stop()
-        
+
+        # Wait threads
+        print("⏳ Waiting for threads...")
+        for t in self.threads:
+            t.join(timeout=2)
+
+        # Stop detector
+        if self.detector:
+            self.detector.stop()
+            self.detector = None
+
+        # MQTT
         print("🔄 Disconnecting MQTT...")
         self.mqtt.disconnect()
-        
+
         print("✅ System stopped cleanly")
 
+    def _signal_handler(self, signum, frame):
+            print(f"\n\n🛑 [maint thread] Stop requested (Ctrl+C). Signal {signum} received")
+            self.stop()
+            sys.exit(0)
 
 def main():
-    """Application entry point"""
     try:
         system = MultiCameraSystem()
         system.start()
     except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
+        exc_type, exc_value, tb = sys.exc_info()
+        filename = tb.tb_frame.f_code.co_filename
+        lineno = tb.tb_lineno
+        print(f"\n❌ {filename}:{lineno} Fatal error: {e}")
+        traceback.print_exc()
         sys.exit(1)
 
 
