@@ -5,6 +5,7 @@ Camera monitoring module with detection and alerts
 import os
 import cv2
 import time
+import psutil
 import shutil
 from datetime import datetime
 from typing import Dict
@@ -12,8 +13,8 @@ import config
 from video_processor import RTSPCapture, VideoProcessor
 from detector import YOLODetector
 from mqtt_manager import MQTTManager
-from threading import Event
-import threading
+import psutil
+from multiprocessing import Event
 
 
 class CameraMonitor:
@@ -41,6 +42,8 @@ class CameraMonitor:
         self.last_detection_time = 0
         self.last_processed_time = 0
         self.frame_count = 0
+
+        self.process = psutil.Process()
         
         # Save directory
         self.save_dir = os.path.join(config.SAVE_DIR, self.name)
@@ -70,8 +73,8 @@ class CameraMonitor:
     def _save_frame(self, frame, timestamp: str):
         """Save frame with detection"""
         # # Don't save for kitchen
-        if "kitchen" in self.name:
-            return
+        # if "kitchen" in self.name:
+        #     return
         
         filename = f"{timestamp}-{self.frame_count:04d}.jpg"
         filepath = os.path.join(self.save_dir, filename)
@@ -85,12 +88,12 @@ class CameraMonitor:
             self.last_detection_time = now
             if self.state == "OFF":
                 self.state = "ON"
-                self.mqtt.publish_state(self.name, self.state)
+                self.mqtt_queue.put((self.name, self.state))
         else:
             # Delay before switching to OFF
             if self.state == "ON" and (now - self.last_detection_time) > config.OFF_DELAY:
                 self.state = "OFF"
-                self.mqtt.publish_state(self.name, self.state)
+                self.mqtt_queue.put((self.name, self.state))
     
     def process_frame(self, frame):
         """
@@ -99,15 +102,8 @@ class CameraMonitor:
         Args:
             frame: Raw camera frame
         """
-        self.frame_count += 1
-        
-        # Check if processing is enabled
-        if not self.mqtt.is_detection_enabled():
-            if self.state != "OFF":
-                self.state = "OFF"
-                self.mqtt.publish_state(self.name, self.state)
-            return
-        
+        self.frame_count += 1        
+
         # Processing throttling
         if not self._should_process_frame():
             return
@@ -116,7 +112,7 @@ class CameraMonitor:
         processed_frame = VideoProcessor.preprocess_frame(frame)
         
         # Detection
-        start = time.time()
+        # start = time.time()
         detections = self.detector.detect_persons(processed_frame)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         # end = time.time()        # 
@@ -137,24 +133,34 @@ class CameraMonitor:
         if self.state == "ON":
             self._save_frame(processed_frame, timestamp)
     
-    def run(self):
+    def run(self, mqtt_queue):
         """Main monitoring loop"""
         print(f"[{self.name}] 🎥 Starting surveillance")
 
         # print(f"[Other Thread ] {threading.current_thread().name}, ID : {threading.get_ident()}")
         
         # Publish initial state
-        self.mqtt.publish_state(self.name, self.state)
+        self.mqtt_queue = mqtt_queue
+        self.mqtt_queue.put((self.name, self.state))
         
         while not self.stop_event.is_set():
+            # self.monitor_cpu(self.stop_event)
+            # Check if processing is enabled
+            if not self.mqtt.is_detection_enabled(self.name):
+                if self.state != "OFF":
+                    self.state = "OFF"
+                    self.mqtt_queue.put((self.name, self.state))
+                time.sleep(0.5)  # 0.5 seconde 
+                continue
+            
             ret, frame = self.capture.read()
 
             # timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
             # print(f"{timestamp} - [{self.name}] new frame")
             
             if not ret:                
-                # timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                # print(f"❌  {timestamp} - [{self.name}] Frame error")
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                print(f"❌  {timestamp} - [{self.name}] Frame error")
                 time.sleep(0.1)
                 continue
             
@@ -169,3 +175,10 @@ class CameraMonitor:
         """Stop surveillance"""
         self.capture.release()
         print(f"[{self.name}] 🛑 Surveillance stopped")
+
+
+    def monitor_cpu(self, stop_event):        
+        i = 1
+        # cpu_total = psutil.cpu_percent(interval=0.5)
+        # cpu_proc = self.process.cpu_percent(interval=None)
+        # print(f"[{self.name}] [CPU] total={cpu_total:.1f}% | process={cpu_proc:.1f}%")

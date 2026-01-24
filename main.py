@@ -4,13 +4,23 @@ Main application for multi-camera surveillance with YOLO detection
 import sys, os
 import traceback
 import signal
-import threading
-from threading import Thread, Event
+import time
+import queue  # pour l'exception Empty
+from multiprocessing import Queue, Process, Event
 from typing import List
 import config
 from mqtt_manager import MQTTManager
 from detector import YOLODetector
 from camera_monitor import CameraMonitor
+
+def monitor_cpu(stop_event):
+    import psutil
+    p = psutil.Process()
+    while not stop_event.is_set():
+        cpu_total = psutil.cpu_percent(interval=0.5)
+        cpu_proc = p.cpu_percent(interval=None)
+        print(f"[CPU] total={cpu_total:.1f}% | process={cpu_proc:.1f}%")
+        time.sleep(0.5)  # ajustable
 
 
 class MultiCameraSystem:
@@ -22,7 +32,7 @@ class MultiCameraSystem:
         print("=" * 60)
 
         # MQTT
-        self.mqtt = MQTTManager()
+        self.mqtt = MQTTManager(on_enable_change=self.handle_detection_change)
         self.mqtt.connect()
 
         # YOLO
@@ -47,7 +57,11 @@ class MultiCameraSystem:
                 )
             )
 
-        self.threads: List[Thread] = []
+        # self.threads: List[Thread] = []
+        self.processes: List[Process] = []
+
+        # Crée une queue partagée pour MQTT
+        self.mqtt_queue = Queue()
 
         print(f"✅ {len(self.monitors)} camera(s) configured")
         print("=" * 60)
@@ -58,30 +72,38 @@ class MultiCameraSystem:
 
         # print(f"[Main Thread ] {threading.current_thread().name}, ID : {threading.get_ident()}")
 
+        # t = Process(
+        #     target=monitor_cpu,
+        #     args=(self.stop_event,),
+        #     daemon=True)
+        # t.start()
+
+        # self.processes.append(t)
+
+        self.stop_event.clear()
+
         for monitor in self.monitors:
-            t = Thread(
-                target=monitor.run,
-                name=f"Monitor-{monitor.name}",
-                daemon=True
-            )
-            t.start()
-            self.threads.append(t)
-            # print(f"▶️  Thread started for {monitor.name}")
+            p = Process(
+                    target=monitor.run,
+                    args=(self.mqtt_queue,))
+            p.start()
+            self.processes.append(p)
 
         print("\n🟢 System operational - Press Ctrl+C to stop")
 
-        try:
-            # Boucle d’attente non bloquante
-            while not self.stop_event.is_set():
-                for t in self.threads:
-                    t.join(timeout=0.5)
+        while True:
+            try:
+                    camera_name, state = self.mqtt_queue.get(timeout=0.1)
+                    self.mqtt.publish_state(camera_name, state)
+            except queue.Empty:
+                pass
+            except KeyboardInterrupt:
+                print("\n\n🛑 Stop requested (Ctrl+C)")
+                self.stop()
 
-        except KeyboardInterrupt:
-            print("\n\n🛑 Stop requested (Ctrl+C)")
-            self.stop()
-        finally:
-            self.restore_terminal()
-            print("✅ Restaure terminal")
+        self.restore_terminal()
+        print("✅ Restaure terminal")
+
 
     def stop(self):
         """Stop system cleanly"""
@@ -91,14 +113,14 @@ class MultiCameraSystem:
 
         self.stop_event.set()
 
+        # Wait threads
+        print("⏳ Waiting for threads...")
+        for p in self.processes:
+            p.join()        # attend qu'ils finissent proprement
+
         # Stop cameras
         for monitor in self.monitors:
             monitor.stop()
-
-        # Wait threads
-        print("⏳ Waiting for threads...")
-        for t in self.threads:
-            t.join(timeout=2)
 
         # Stop detector
         if self.detector:
@@ -113,10 +135,11 @@ class MultiCameraSystem:
         print("🎬 Multi-Camera Surveillance System stopped cleanly")
         print("=" * 60)
 
-    # def _signal_handler(self, signum, frame):
-    #         print(f"\n\n🛑 [maint thread] Stop requested (Ctrl+C). Signal {signum} received")
-    #         self.stop()
-    #         sys.exit(0)
+
+
+    def handle_detection_change(self, camera_name: str, enabled: bool):
+        state = "ENABLED" if enabled else "DISABLED"
+        # print(f"[APP] Detection {state} for camera: {camera_name}")
 
     def restore_terminal(this):
         """Restaure bash à coup sûr"""

@@ -59,6 +59,8 @@ Edit `config.py` to configure:
 ### Launch system
 
 ```bash
+cd ~/sandbox/cam_detector
+source venv/bin/activate
 python main.py
 ```
 
@@ -167,6 +169,49 @@ self.streamer.write_frame(processed_frame)
 - 3s delay before switching to OFF after last detection
 - Processing interval: 1 frame/second
 - Confidence threshold: 40%
+- Home assistant configuration :
+```yaml
+binary_sensor:
+  - name: "camera_kitchen_detection"
+    state_topic: "home/camera/kitchen/detection"
+    payload_on: "ON"
+    payload_off: "OFF"
+    device_class: motion
+
+  - name: "camera_ext_north_detection"
+    state_topic: "home/camera/ext_north/detection"
+    payload_on: "ON"
+    payload_off: "OFF"
+    device_class: motion
+
+  - name: "camera_ext_south_detection"
+    state_topic: "home/camera/ext_south/detection"
+    payload_on: "ON"
+    payload_off: "OFF"
+    device_class: motion
+
+switch:
+  - name: "camera_detector_kitchen_switch"
+    command_topic: "home/camera/kitchen/detection/enable"
+    state_topic: "home/camera/kitchen/detection/enable"
+    payload_on: "ON"
+    payload_off: "OFF"
+    optimistic: false
+
+  - name: "camera_detector_ext_north_switch"
+    command_topic: "home/camera/ext_north/detection/enable"
+    state_topic: "home/camera/ext_north/detection/enable"
+    payload_on: "ON"
+    payload_off: "OFF"
+    optimistic: false
+
+  - name: "camera_detector_ext_south_switch"
+    command_topic: "home/camera/ext_south/detection/enable"
+    state_topic: "home/camera/ext_south/detection/enable"
+    payload_on: "ON"
+    payload_off: "OFF"
+    optimistic: false
+```
 
 ## 🐛 Troubleshooting
 

@@ -111,7 +111,9 @@ class RTSPCapture:
         print(f"[{self.camera_name}] 🔄  Connecting to RTSP stream...")
 
         try:
-            self.width,  self.height = self.get_resolution(self.url )
+            # self.width,  self.height = self.get_resolution(self.url )
+            self.width = 768
+            self.height = 432
 
             cmd = [
                 "ffmpeg",
@@ -139,11 +141,16 @@ class RTSPCapture:
         print(f"[{self.camera_name}] ✅ RTSPCapture configured (resolution detected  : {self.width}x{self.height}) !")
 
     def read(self) -> Tuple[bool, np.ndarray]:
-        if not self.proc or self.proc.poll() is not None:
+        if not self.proc : # or self.proc.poll() is not None
+            print(f"self.proc.poll() {self.proc.poll()}")
             return False, None
 
         raw = self.proc.stdout.read(self.frame_size)
         if not raw or len(raw) < self.frame_size:
+            if not raw:
+                print(f"❌ [{self.camera_name}] RTSP error. no frame received")
+            else:
+                print(f"❌ [{self.camera_name}] RTSP error. frame size in not good {len(raw)} vs {self.frame_size} expected")
             return False, None
 
         frame = np.frombuffer(raw, np.uint8)\

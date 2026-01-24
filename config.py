@@ -23,9 +23,21 @@ COCO_CLASSES = [
 
 # Camera configuration
 CAMERAS = [
-    {"name": "kitchen", "url": "rtsp://DY9bKwcB:l9lSQDtDCvLmNZUT@192.168.68.52/live/ch1"},
-    # {"name": "ext_north", "url": "rtsp://FlZgCcmK:eALNj6HmzLZ9MDzF@192.168.68.54/live/ch1"},
-    # {"name": "ext_south", "url": "rtsp://T7iby8nk:jx1IXcoYaUe5jrHs@192.168.68.53/live/ch1"}
+    {
+        "name": "kitchen",
+        "url": "rtsp://DY9bKwcB:l9lSQDtDCvLmNZUT@192.168.68.52/live/ch1",
+        "enable_topic": "home/camera/kitchen/detection/enable",
+    },
+    {   
+        "name": "ext_north",
+        "url": "rtsp://FlZgCcmK:eALNj6HmzLZ9MDzF@192.168.68.54/live/ch1",
+        "enable_topic": "home/camera/ext_north/detection/enable",
+    },
+    {   
+        "name": "ext_south",
+        "url": "rtsp://T7iby8nk:jx1IXcoYaUe5jrHs@192.168.68.53/live/ch1",
+        "enable_topic": "home/camera/ext_south/detection/enable",
+    }
 ]
 
 # Video processing parameters
@@ -44,7 +56,6 @@ MQTT_BROKER = "192.168.68.55"
 MQTT_PORT = 1883
 MQTT_USERNAME = "z2mqtt"
 MQTT_PASSWORD = "Viclin4*"
-MQTT_ENABLE_TOPIC = "home/camera/detection/enable"
 MQTT_STATE_TOPIC_PREFIX = "home/camera"
 
 # RTSP streaming configuration (FFmpeg)
