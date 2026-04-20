@@ -9,7 +9,7 @@ tar -xzf mediamtx_linux_amd64.tar.gz
 rtsp://192.168.68.64:8554/
 
 test mqtt :
-mosquitto_sub -h 192.168.68.55 -p 1883 -u z2mqtt -P Viclin4* -t home/camera/# -v
+mosquitto_sub -h 192.168.68.55 -p 1883 -u z2mqtt -P V* -t home/camera/# -v
 
 
 # 🎥 Multi-Camera Surveillance System with AI Detection
