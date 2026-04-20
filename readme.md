@@ -69,11 +69,11 @@ python main.py
 **Enable/Disable detection**:
 ```bash
 # Enable
-mosquitto_pub -h 192.168.68.55 -u z2mqtt -P "Viclin4*" \
+mosquitto_pub -h 192.168.68.55 -u z2mqtt -P "V" \
   -t "home/camera/detection/enable" -m "ON"
 
 # Disable
-mosquitto_pub -h 192.168.68.55 -u z2mqtt -P "Viclin4*" \
+mosquitto_pub -h 192.168.68.55 -u z2mqtt -P "V" \
   -t "home/camera/detection/enable" -m "OFF"
 ```
 
